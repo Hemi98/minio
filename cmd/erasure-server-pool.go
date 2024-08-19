@@ -187,17 +187,10 @@ func newErasureServerPools(ctx context.Context, endpointServerPools EndpointServ
 		globalLeaderLock = newSharedLock(GlobalContext, z, "leader.lock")
 	})
 
-	// Enable background operations on
-	//
-	// - Disk auto healing
-	// - MRF (most recently failed) healing
-	// - Background expiration routine for lifecycle policies
+	// Start self healing after the object initialization
+	// so various tasks will be useful
 	bootstrapTrace("initAutoHeal", func() {
 		initAutoHeal(GlobalContext, z)
-	})
-
-	bootstrapTrace("initHealMRF", func() {
-		go globalMRFState.healRoutine(z)
 	})
 
 	// initialize the object layer.
@@ -2129,7 +2122,7 @@ func (z *erasureServerPools) Walk(ctx context.Context, bucket, prefix string, re
 			disks, infos, _ := set.getOnlineDisksWithHealingAndInfo(true)
 			if len(disks) == 0 {
 				xioutil.SafeClose(results)
-				err := fmt.Errorf("Walk: no online disks found in pool %d, set %d", setIdx, poolIdx)
+				err := fmt.Errorf("Walk: no online disks found in (set:%d pool:%d) %w", setIdx, poolIdx, errErasureReadQuorum)
 				cancelCause(err)
 				return err
 			}
